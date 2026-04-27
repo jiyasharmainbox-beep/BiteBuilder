@@ -30,14 +30,14 @@ A FastAPI-based web application with user authentication, blog posts, and AI-pow
 
 **Windows (PowerShell / CMD):**
 ```powershell
-git clone <your-repo-url>
-cd MyRepo
+git clone https://github.com/jiyasharmainbox-beep/BiteBuilder.git
+cd BiteBuilder
 ```
 
 **macOS (Terminal):**
 ```bash
-git clone <your-repo-url>
-cd MyRepo
+git clone https://github.com/jiyasharmainbox-beep/BiteBuilder.git
+cd BiteBuilder
 ```
 
 ### 2. Create and activate the virtual environment
