@@ -7,7 +7,6 @@ A FastAPI-based web application with user authentication, blog posts, and AI-pow
 - User registration, login, and profile management
 - Blog post creation and browsing
 - Recipe search by ingredients (Spoonacular API)
-- AI-powered recipe suggestions from food images (Google Gemini)
 - SQLite database (auto-created on first run)
 
 ---
@@ -19,7 +18,6 @@ A FastAPI-based web application with user authentication, blog posts, and AI-pow
 | **Python 3.13+** | [python.org/downloads](https://www.python.org/downloads/) — check "Add to PATH" during install | `brew install python@3.13` (requires [Homebrew](https://brew.sh)) |
 | **Git** | [git-scm.com/download/win](https://git-scm.com/download/win) | `brew install git` or `xcode-select --install` |
 | **uv** (package manager) | `pip install uv` in PowerShell | `brew install uv` or `pip install uv` |
-| **Google Gemini API key** | Get from [aistudio.google.com](https://aistudio.google.com/app/apikey) | Same |
 | **Spoonacular API key** | Get from [spoonacular.com/food-api](https://spoonacular.com/food-api/console#Dashboard) | Same |
 
 ---
@@ -78,14 +76,7 @@ SPOONACULAR_API_KEY=your_spoonacular_api_key_here
 > python -c "import secrets; print(secrets.token_hex(32))"
 > ```
 
-### 5. Set the Gemini API key
-
-Open `routers/recipes.py` and update line 13:
-```python
-YOUR_GEMINI_API_KEY = "your_gemini_api_key_here"
-```
-
-### 6. Create required media directory
+### 5. Create required media directory
 
 **Windows:**
 ```powershell
@@ -97,7 +88,7 @@ mkdir media\profile_pics
 mkdir -p media/profile_pics
 ```
 
-### 7. (Optional) Populate the database with sample data
+### 6. (Optional) Populate the database with sample data
 
 ```bash
 python populate_db.py
@@ -108,10 +99,10 @@ python populate_db.py
 ## Usage
 
 ```bash
-uvicorn main:app --reload
+uv run fastapi dev main.py
 ```
 
-Open your browser at: [http://localhost:8000](http://localhost:8000)
+Open your browser at: http://127.0.0.1:8000
 
 > The database (`blog.db`) is created automatically on first run — no database server needed.
 
