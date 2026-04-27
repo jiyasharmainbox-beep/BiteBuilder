@@ -1,6 +1,8 @@
 # BiteBuilder
 
-A FastAPI-based web application with user authentication, blog posts, and AI-powered recipe features.
+Turn your Pantry into Recipes!
+
+A FastAPI-based web application with user authentication, blog posts, and recipe generator by simply typing ingredients. 
 
 ## Features
 
