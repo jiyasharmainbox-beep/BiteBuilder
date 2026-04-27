@@ -1,0 +1,165 @@
+{% extends "layout.html" %} {% block content %}
+<h1 class="mb-4">Welcome!</h1>
+
+<!-- Guest welcome banner — hidden by default, shown via JS for non-logged-in users -->
+<div id="guestBanner" class="d-none mb-4">
+  <div class="content-section py-4 px-4 text-center">
+    <p
+      class="text-uppercase fw-bold text-body-secondary mb-1 ls-wide"
+      style="letter-spacing: 0.15em; font-size: 0.8rem"
+    >
+      Pantry to Recipe
+    </p>
+    <h2 class="fw-bold mb-3">Welcome to BiteBuilder 🍽️</h2>
+    <p class="lead mb-1">Not sure what to cook for dinner?</p>
+    <p
+      class="display-6 fw-semibold mb-3"
+      style="font-size: clamp(1.1rem, 3vw, 1.5rem)"
+    >
+      Snap it.&nbsp; Upload it.&nbsp; Cook it!
+    </p>
+    <p
+      class="text-body-secondary mb-4"
+      style="max-width: 520px; margin-inline: auto"
+    >
+      BiteBuilder features multiple recipes which you can use to make the best
+      meal of your life!
+    </p>
+    <div class="d-flex justify-content-center">
+      <ol
+        class="text-start mb-4"
+        style="
+          max-width: 360px;
+          font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+          line-height: 1.8;
+        "
+      >
+        <li class="mb-1">
+          <a href="/login">Login</a> / <a href="/register">Register</a>
+        </li>
+        <li class="mb-1">Click on the 📷 camera icon</li>
+        <li class="mb-1">
+          Take a photo of the food item you want to use or already have
+        </li>
+        <li>BiteBuilder will then give you your recipe!</li>
+      </ol>
+    </div>
+    <a href="/register" class="btn btn-primary me-2">Get Started</a>
+    <a href="/login" class="btn btn-outline-secondary">Log In</a>
+  </div>
+</div>
+<script>
+  if (!localStorage.getItem("access_token")) {
+    document.getElementById("guestBanner").classList.remove("d-none");
+  }
+</script>
+
+<div id="favouritesSection" class="d-none">
+  <h4 class="mb-3">⭐ Your Favourite Recipes</h4>
+  <div id="favouritesContainer"></div>
+  <p id="noFavouritesMsg" class="text-body-secondary d-none">
+    You have no saved recipes yet. <a href="/recipes">Find recipes</a> and click
+    the ★ star to save them here.
+  </p>
+</div>
+
+{% endblock content %} {% block scripts %}
+<script type="module">
+  import { escapeHtml } from "/static/js/utils.js";
+  import { getToken } from "/static/js/auth.js";
+
+  async function loadFavourites() {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const res = await fetch("/api/recipes/favourites", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const favourites = await res.json();
+
+      const section = document.getElementById("favouritesSection");
+      const container = document.getElementById("favouritesContainer");
+      const noMsg = document.getElementById("noFavouritesMsg");
+
+      section.classList.remove("d-none");
+
+      if (favourites.length === 0) {
+        noMsg.classList.remove("d-none");
+        return;
+      }
+
+      for (const fav of favourites) {
+        const card = createFavouriteCard(fav);
+        container.appendChild(card);
+      }
+    } catch {
+      // not logged in or network error
+    }
+  }
+
+  function createFavouriteCard(fav) {
+    const el = document.createElement("div");
+    el.innerHTML = `
+      <article class="content-section py-3 px-4 mb-3" data-fav-id="${fav.recipe_id}">
+        <div class="d-flex align-items-center gap-4">
+          <img
+            src="${escapeHtml(fav.recipe_image)}"
+            alt="${escapeHtml(fav.recipe_title)}"
+            class="rounded flex-shrink-0"
+            width="100"
+            height="75"
+            style="object-fit:cover;"
+            loading="lazy"
+          >
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">
+                <a
+                  href="https://spoonacular.com/recipes/${encodeURIComponent(fav.recipe_title.toLowerCase().replace(/\s+/g, "-"))}-${fav.recipe_id}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >${escapeHtml(fav.recipe_title)}</a>
+              </h6>
+              <button
+                type="button"
+                class="btn btn-outline-danger btn-sm remove-fav-btn"
+                title="Remove from Favourites"
+                style="font-size:1rem;"
+              >★ Remove</button>
+            </div>
+          </div>
+        </div>
+      </article>`;
+
+    el.querySelector(".remove-fav-btn").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const token = getToken();
+      try {
+        const res = await fetch(`/api/recipes/favourites/${fav.recipe_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok || res.status === 404) {
+          el.firstElementChild.remove();
+          // Show "no favourites" message if none left
+          const container = document.getElementById("favouritesContainer");
+          if (!container.querySelector("article")) {
+            document
+              .getElementById("noFavouritesMsg")
+              .classList.remove("d-none");
+          }
+        }
+      } catch {
+        btn.disabled = false;
+      }
+    });
+
+    return el.firstElementChild;
+  }
+
+  loadFavourites();
+</script>
+{% endblock scripts %}

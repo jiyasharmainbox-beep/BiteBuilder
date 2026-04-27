@@ -1,0 +1,660 @@
+{% extends "layout.html" %} {% block content %}
+<div class="content-section py-3 px-4 mb-4">
+  <h2 class="mb-4">Find Recipes</h2>
+  <div
+    class="alert alert-info border-start border-4 border-info mb-4"
+    role="note"
+    style="
+      background-color: var(--bs-info-bg-subtle, #cff4fc);
+      padding: clamp(0.75rem, 3vw, 1.25rem);
+    "
+  >
+    <p
+      class="fw-semibold mb-2"
+      style="font-size: clamp(1rem, 2.5vw, 1.125rem); line-height: 1.5"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        fill="currentColor"
+        class="bi bi-info-circle-fill me-2 flex-shrink-0 align-text-bottom"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path
+          d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194
+                 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703
+                 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381
+                 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"
+        />
+      </svg>
+      Search for recipes by ingredients in three easy steps:
+    </p>
+    <ol
+      class="mb-0 ps-3"
+      style="font-size: clamp(0.95rem, 2.5vw, 1.05rem); line-height: 1.7"
+    >
+      <li class="mb-1">
+        Type one ingredient at a time you have on hand (e.g. eggs, bananas,
+        apple).
+      </li>
+      <li class="mb-1">
+        Click the <strong>"+"</strong> button to add it to your search — or use
+        the <strong>📷 camera</strong> button to identify ingredients visually.
+      </li>
+      <li>
+        Click <strong>"Search"</strong> to find recipes you can make with those
+        ingredients.
+      </li>
+    </ol>
+  </div>
+  <form id="searchForm" class="mb-4">
+    <div class="input-group">
+      <input
+        type="text"
+        class="form-control"
+        id="searchQuery"
+        placeholder="Add an ingredient"
+      />
+      <button
+        class="btn btn-outline-secondary"
+        type="button"
+        id="addToSearchCriteria"
+        title="Add ingredient"
+      >
+        +
+      </button>
+      <button
+        class="btn btn-outline-secondary"
+        type="button"
+        id="cameraBtn"
+        title="Identify ingredient from camera"
+      >
+        📷
+      </button>
+    </div>
+    <br />
+    <div id="badgeContainer" class="mb-3"></div>
+    <br />
+    <input type="hidden" id="searchCriteria" />
+    <br />
+    <button class="btn btn-primary" type="submit" id="submitBtn">Search</button>
+    <button class="btn btn-secondary" type="reset" id="resetBtn">Reset</button>
+  </form>
+  <div id="resultsContainer"></div>
+  <div class="text-center mb-4 d-none" id="loadMoreContainer">
+    <button type="button" class="btn btn-outline-primary" id="loadMoreBtn">
+      Load More Recipes
+    </button>
+  </div>
+  <div id="paginationInfo" class="text-body-secondary small mb-3 d-none"></div>
+</div>
+
+<!-- Camera Modal -->
+<div
+  class="modal fade"
+  id="cameraModal"
+  tabindex="-1"
+  aria-labelledby="cameraModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cameraModalLabel">Identify Ingredient</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body text-center">
+        <!-- Live camera view -->
+        <div id="cameraView">
+          <video
+            id="cameraStream"
+            autoplay
+            playsinline
+            class="w-100 rounded mb-3"
+            style="max-height: 350px; object-fit: cover"
+          ></video>
+          <button type="button" class="btn btn-primary" id="captureBtn">
+            📸 Capture
+          </button>
+        </div>
+        <!-- Preview + identification result (hidden until capture) -->
+        <div id="previewView" class="d-none">
+          <img
+            id="capturedPreview"
+            class="img-fluid rounded mb-3"
+            alt="Captured ingredient"
+            style="max-height: 300px"
+          />
+          <div id="identifyStatus" class="mb-3"></div>
+          <div id="identifiedResult" class="d-none">
+            <label for="identifiedIngredient" class="form-label fw-semibold">
+              Identified ingredient
+              <span class="text-body-secondary fw-normal">(edit if needed)</span
+              >:
+            </label>
+            <div class="input-group">
+              <input
+                type="text"
+                class="form-control"
+                id="identifiedIngredient"
+                placeholder="e.g. apple"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="btn btn-success"
+                id="addIdentifiedBtn"
+              >
+                + Add to Search
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-secondary mt-3"
+            id="retakeBtn"
+          >
+            🔄 Retake
+          </button>
+        </div>
+        <!-- Camera error view -->
+        <div id="cameraErrorView" class="d-none">
+          <div class="alert alert-danger" role="alert" id="cameraErrorMsg">
+            Camera access was denied or is unavailable.
+          </div>
+        </div>
+      </div>
+      <!-- Hidden canvas used to grab a frame from the video -->
+      <canvas id="captureCanvas" class="d-none"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock content %} {% block scripts %}
+<script type="module">
+  import { escapeHtml, getErrorMessage, showModal } from "/static/js/utils.js";
+  import { getCurrentUser, getToken } from "/static/js/auth.js";
+
+  const form = document.getElementById("searchForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const searchQueryInput = document.getElementById("searchQuery");
+  const searchCriteriaInput = document.getElementById("searchCriteria");
+  const addToSearchCriteriaBtn = document.getElementById("addToSearchCriteria");
+  const resultsContainer = document.getElementById("resultsContainer");
+  const badgeContainer = document.getElementById("badgeContainer");
+  const loadMoreContainer = document.getElementById("loadMoreContainer");
+  const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+  const LIMIT = 6;
+  let currentSkip = 0;
+  let hasMore = false;
+  let activeQuery = "";
+  let totalRecords = 0;
+  let favouriteIds = new Set(); // recipe_id values already saved
+  let isLoggedIn = false;
+
+  const paginationInfo = document.getElementById("paginationInfo");
+
+  function updatePaginationInfo() {
+    if (totalRecords === 0) {
+      paginationInfo.classList.add("d-none");
+      return;
+    }
+    const totalPages = Math.ceil(totalRecords / LIMIT);
+    const currentPage = Math.ceil(currentSkip / LIMIT);
+    paginationInfo.textContent = `${totalRecords} recipe${totalRecords !== 1 ? "s" : ""} found · Page ${currentPage} of ${totalPages}`;
+    paginationInfo.classList.remove("d-none");
+  }
+
+  // ── Shared: add an ingredient badge ─────────────────────────────────────
+
+  function addIngredientBadge(query) {
+    const currentCriteria = searchCriteriaInput.value;
+
+    if (currentCriteria.toLowerCase().includes(query.toLowerCase())) {
+      document.getElementById("errorMessage").textContent =
+        "This ingredient is already in your search criteria.";
+      showModal("errorModal");
+      return false;
+    }
+
+    searchCriteriaInput.value = currentCriteria
+      ? `${currentCriteria}, ${query}`
+      : query;
+
+    const badge = document.createElement("span");
+    badge.className = "badge bg-secondary me-2 mb-2";
+    badge.textContent = query;
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "btn-close btn-close-white btn-sm ms-2";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.addEventListener("click", () => {
+      badge.remove();
+      searchCriteriaInput.value = searchCriteriaInput.value
+        .split(", ")
+        .filter((item) => item !== query)
+        .join(", ");
+    });
+    badge.appendChild(closeBtn);
+    badgeContainer.appendChild(badge);
+    return true;
+  }
+
+  // ── + button ────────────────────────────────────────────────────────────────
+
+  // search filters
+  addToSearchCriteriaBtn.addEventListener("click", () => {
+    const regex = /^[a-zA-Z0-9\s]+$/;
+    if (!regex.test(searchQueryInput.value.trim())) {
+      document.getElementById("errorMessage").textContent =
+        "Please enter only letters and numbers.";
+      showModal("errorModal");
+      return;
+    }
+
+    const query = searchQueryInput.value.trim();
+    if (!query) return;
+
+    if (addIngredientBadge(query)) {
+      searchQueryInput.value = "";
+    }
+  });
+
+  // ── Favourites ───────────────────────────────────────────────────────────────
+
+  async function loadFavouriteIds() {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch("/api/recipes/favourites", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        favouriteIds = new Set(data.map((f) => f.recipe_id));
+        isLoggedIn = true;
+      }
+    } catch {
+      // not logged in or network error — silently skip
+    }
+  }
+
+  async function toggleFavourite(recipe, btn) {
+    const token = getToken();
+    if (!token) {
+      document.getElementById("errorMessage").textContent =
+        "Please log in to save favourite recipes.";
+      showModal("errorModal");
+      return;
+    }
+
+    const isFav = favouriteIds.has(recipe.id);
+    btn.disabled = true;
+    try {
+      if (isFav) {
+        const res = await fetch(`/api/recipes/favourites/${recipe.id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok || res.status === 404) {
+          favouriteIds.delete(recipe.id);
+          btn.textContent = "☆";
+          btn.title = "Save to Favourites";
+          btn.classList.remove("btn-warning");
+          btn.classList.add("btn-outline-warning");
+        }
+      } else {
+        const res = await fetch("/api/recipes/favourites", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            recipe_id: recipe.id,
+            recipe_title: recipe.title,
+            recipe_image: recipe.image,
+          }),
+        });
+        if (res.ok) {
+          favouriteIds.add(recipe.id);
+          btn.textContent = "★";
+          btn.title = "Remove from Favourites";
+          btn.classList.remove("btn-outline-warning");
+          btn.classList.add("btn-warning");
+        } else if (res.status === 409) {
+          // Already saved (race condition) — sync state
+          favouriteIds.add(recipe.id);
+          btn.textContent = "★";
+          btn.classList.remove("btn-outline-warning");
+          btn.classList.add("btn-warning");
+        }
+      }
+    } catch {
+      document.getElementById("errorMessage").textContent =
+        "Could not update favourites. Please try again.";
+      showModal("errorModal");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // search results
+
+  function createRecipeCard(recipe) {
+    const usedBadges = recipe.usedIngredients
+      .map(
+        (i) =>
+          `<span class="badge bg-success me-1 mb-1">${escapeHtml(i.name)}</span>`,
+      )
+      .join("");
+
+    const missedBadges = recipe.missedIngredients
+      .map(
+        (i) =>
+          `<span class="badge bg-danger me-1 mb-1">${escapeHtml(i.name)}</span>`,
+      )
+      .join("");
+
+    const isFav = favouriteIds.has(recipe.id);
+    const starLabel = isFav ? "★" : "☆";
+    const starTitle = isFav ? "Remove from Favourites" : "Save to Favourites";
+    const starClass = isFav
+      ? "btn btn-warning btn-sm fav-btn"
+      : "btn btn-outline-warning btn-sm fav-btn";
+
+    const el = document.createElement("div");
+    el.innerHTML = `
+      <article class="content-section py-3 px-4 mb-4" data-recipe-id="${recipe.id}">
+        <div class="d-flex align-items-start gap-4">
+          <img
+            src="${escapeHtml(recipe.image)}"
+            alt="${escapeHtml(recipe.title)}"
+            class="rounded flex-shrink-0"
+            width="120"
+            height="90"
+            style="object-fit:cover;"
+            loading="lazy"
+          >
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start">
+              <h5 class="article-title mb-1">
+                <a
+                  href="https://spoonacular.com/recipes/${encodeURIComponent(recipe.title.toLowerCase().replace(/\s+/g, "-"))}-${recipe.id}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >${escapeHtml(recipe.title)}</a>
+              </h5>
+              <button type="button" class="${starClass}" title="${starTitle}" style="font-size:1.2rem;line-height:1;">${starLabel}</button>
+            </div>
+            <small class="text-body-secondary">
+              ♥ ${recipe.likes} likes &nbsp;·&nbsp;
+              ✅ ${recipe.usedIngredientCount} used &nbsp;·&nbsp;
+              ❌ ${recipe.missedIngredientCount} missing
+            </small>
+            ${
+              usedBadges
+                ? `<div class="mt-2"><strong class="small">Used:</strong><br>${usedBadges}</div>`
+                : ""
+            }
+            ${
+              missedBadges
+                ? `<div class="mt-1"><strong class="small">Missing:</strong><br>${missedBadges}</div>`
+                : ""
+            }
+          </div>
+        </div>
+      </article>`;
+
+    el.querySelector(".fav-btn").addEventListener("click", (e) => {
+      toggleFavourite(recipe, e.currentTarget);
+    });
+    return el.firstElementChild;
+  }
+
+  //get recipes from API
+
+  async function fetchRecipes(ingredients, skip) {
+    const params = new URLSearchParams({ ingredients, skip, limit: LIMIT });
+    const response = await fetch(`/api/recipes/search?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(getErrorMessage(error) || "Failed to fetch recipes.");
+    }
+    return response.json();
+  }
+
+  async function loadRecipes(replace) {
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = "Loading...";
+
+    try {
+      const data = await fetchRecipes(activeQuery, currentSkip);
+
+      if (replace) {
+        resultsContainer.innerHTML = "";
+      }
+
+      if (replace) {
+        totalRecords = data.total;
+      }
+
+      if (data.recipes.length === 0 && replace) {
+        totalRecords = 0;
+        resultsContainer.innerHTML =
+          '<p class="text-body-secondary">No recipes found. Try different ingredients.</p>';
+      } else {
+        for (const recipe of data.recipes) {
+          resultsContainer.appendChild(createRecipeCard(recipe));
+        }
+      }
+
+      currentSkip += data.recipes.length;
+      hasMore = data.has_more;
+      updatePaginationInfo();
+
+      if (hasMore) {
+        loadMoreContainer.classList.remove("d-none");
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = "Load More Recipes";
+      } else {
+        loadMoreContainer.classList.add("d-none");
+      }
+    } catch (error) {
+      loadMoreBtn.textContent = "Error – Click to Retry";
+      loadMoreBtn.disabled = false;
+      document.getElementById("errorMessage").textContent = error.message;
+      showModal("errorModal");
+    }
+  }
+
+  searchQueryInput.addEventListener("keypress", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addToSearchCriteriaBtn.click();
+    }
+  });
+
+  // Load favourite IDs on page init so stars render correctly
+  loadFavouriteIds();
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!searchCriteriaInput.value) {
+      document.getElementById("errorMessage").textContent =
+        "Please add at least one ingredient to search.";
+      showModal("errorModal");
+      return;
+    }
+
+    activeQuery = searchCriteriaInput.value;
+    currentSkip = 0;
+
+    submitBtn.disabled = true;
+    resetBtn.disabled = true;
+    addToSearchCriteriaBtn.disabled = true;
+    submitBtn.textContent = "Searching...";
+
+    await loadRecipes(true);
+
+    submitBtn.disabled = false;
+    resetBtn.disabled = false;
+    addToSearchCriteriaBtn.disabled = false;
+    submitBtn.textContent = "Search";
+  });
+
+  // ── Camera ──────────────────────────────────────────────────────────────────
+
+  const cameraModalEl = document.getElementById("cameraModal");
+  const cameraStreamEl = document.getElementById("cameraStream");
+  const cameraViewEl = document.getElementById("cameraView");
+  const captureCanvasEl = document.getElementById("captureCanvas");
+  const previewViewEl = document.getElementById("previewView");
+  const capturedPreviewEl = document.getElementById("capturedPreview");
+  const identifyStatusEl = document.getElementById("identifyStatus");
+  const identifiedResultEl = document.getElementById("identifiedResult");
+  const identifiedIngredientInput = document.getElementById(
+    "identifiedIngredient",
+  );
+  const cameraErrorViewEl = document.getElementById("cameraErrorView");
+  const cameraErrorMsgEl = document.getElementById("cameraErrorMsg");
+
+  let activeStream = null;
+
+  async function startCamera() {
+    cameraViewEl.classList.remove("d-none");
+    previewViewEl.classList.add("d-none");
+    cameraErrorViewEl.classList.add("d-none");
+    try {
+      // "environment" = rear camera on mobile; browsers fall back to front on desktop
+      activeStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+      cameraStreamEl.srcObject = activeStream;
+    } catch (err) {
+      cameraViewEl.classList.add("d-none");
+      cameraErrorViewEl.classList.remove("d-none");
+      cameraErrorMsgEl.textContent =
+        err.name === "NotAllowedError"
+          ? "Camera permission denied. Please allow camera access in your browser settings and try again."
+          : `Camera unavailable: ${err.message}`;
+    }
+  }
+
+  function stopCamera() {
+    if (activeStream) {
+      activeStream.getTracks().forEach((t) => t.stop());
+      activeStream = null;
+    }
+    cameraStreamEl.srcObject = null;
+  }
+
+  // Start camera when modal opens
+  cameraModalEl.addEventListener("shown.bs.modal", startCamera);
+
+  // Clean up when modal closes
+  cameraModalEl.addEventListener("hidden.bs.modal", () => {
+    stopCamera();
+    cameraViewEl.classList.remove("d-none");
+    previewViewEl.classList.add("d-none");
+    cameraErrorViewEl.classList.add("d-none");
+    identifiedResultEl.classList.add("d-none");
+    identifyStatusEl.innerHTML = "";
+    identifiedIngredientInput.value = "";
+  });
+
+  document.getElementById("cameraBtn").addEventListener("click", () => {
+    bootstrap.Modal.getOrCreateInstance(cameraModalEl).show();
+  });
+
+  document.getElementById("captureBtn").addEventListener("click", () => {
+    // Grab current frame from the video stream
+    captureCanvasEl.width = cameraStreamEl.videoWidth || 640;
+    captureCanvasEl.height = cameraStreamEl.videoHeight || 480;
+    captureCanvasEl.getContext("2d").drawImage(cameraStreamEl, 0, 0);
+
+    // Show preview and stop the live stream
+    capturedPreviewEl.src = captureCanvasEl.toDataURL("image/jpeg", 0.85);
+    stopCamera();
+    cameraViewEl.classList.add("d-none");
+    previewViewEl.classList.remove("d-none");
+    identifiedResultEl.classList.add("d-none");
+    identifyStatusEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2" role="status"></div>Identifying ingredient…`;
+
+    // Send to backend for identification
+    captureCanvasEl.toBlob(
+      async (blob) => {
+        const formData = new FormData();
+        formData.append("file", blob, "ingredient.jpg");
+
+        try {
+          const response = await fetch("/api/recipes/classify-image", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await response.json();
+
+          if (response.ok && data.ingredient) {
+            const pct = Math.round((data.confidence ?? 0) * 100);
+            identifyStatusEl.innerHTML = `<span class="text-success">✅ Identified: <strong>${escapeHtml(data.ingredient)}</strong> (${pct}% confidence)</span>`;
+            identifiedIngredientInput.value = data.ingredient;
+          } else {
+            identifyStatusEl.innerHTML = `<span class="text-warning">⚠️ Could not identify the ingredient. Please type it manually below.</span>`;
+            identifiedIngredientInput.value = "";
+          }
+          identifiedResultEl.classList.remove("d-none");
+        } catch {
+          identifyStatusEl.innerHTML = `<span class="text-danger">Network error. Could not reach the identification service.</span>`;
+          identifiedResultEl.classList.remove("d-none");
+        }
+      },
+      "image/jpeg",
+      0.85,
+    );
+  });
+
+  document.getElementById("retakeBtn").addEventListener("click", startCamera);
+
+  document.getElementById("addIdentifiedBtn").addEventListener("click", () => {
+    const ingredient = identifiedIngredientInput.value.trim();
+    if (!ingredient) return;
+    if (addIngredientBadge(ingredient)) {
+      bootstrap.Modal.getInstance(cameraModalEl).hide();
+    }
+  });
+
+  //Load more
+  loadMoreBtn.addEventListener("click", () => loadRecipes(false));
+
+  //Reset
+  resetBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    searchCriteriaInput.value = "";
+    searchQueryInput.value = "";
+    badgeContainer.innerHTML = "";
+    resultsContainer.innerHTML = "";
+    loadMoreContainer.classList.add("d-none");
+    paginationInfo.classList.add("d-none");
+    activeQuery = "";
+    currentSkip = 0;
+    hasMore = false;
+    totalRecords = 0;
+    submitBtn.disabled = false;
+    resetBtn.disabled = false;
+    addToSearchCriteriaBtn.disabled = false;
+    submitBtn.textContent = "Search";
+  });
+</script>
+{% endblock scripts %}
